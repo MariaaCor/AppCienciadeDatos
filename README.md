@@ -1,21 +1,20 @@
 # API Canciones
 
-API REST para administrar canciones y disqueras, con autenticación por token.
-Node.js + Express + Mongoose + MongoDB Atlas + dotenv + jwt-simple.
+API REST para administrar canciones y disqueras, con inicio de sesión por token (Node.js + Express + Mongoose + MongoDB Atlas + jwt-simple).
 
 Arquitectura: Cliente → Ruta → Middleware (token) → Controlador → Modelo → MongoDB
 
 ## Estructura
 
 ```
-config/db.js                       Conexión a MongoDB
-controllers/                       cancion, disquera, ubicacion y usuario
-middleware/encodeToken.js          Genera el token (iat y exp de 5 días)
-middleware/decodeToken.js          Valida el token y llama a next()
-models/                            Cancion, Disquera y Usuario
-routes/rutas.js                    Todas las rutas del proyecto
-services/ubicacionService.js       Consulta de ciudad (OpenStreetMap)
-imagenes/                          Reservada para imágenes
+config/db.js                      Conexión a MongoDB
+controllers/                      Lógica de cada recurso (canción, disquera, usuario, ubicación)
+middleware/encodeToken.js         Genera el token (iat y exp de 5 días)
+middleware/decodeToken.js         Valida el token y llama a next()
+models/                           Esquemas: Cancion, Disquera, Usuario
+routes/rutas.js                   Todas las rutas del proyecto
+services/ubicacionService.js      Consulta de ciudad por coordenadas (Nominatim)
+imagenes/                         Carpeta reservada para imágenes
 ```
 
 ## Configuración
@@ -27,57 +26,60 @@ DB_MONGO=mongodb+srv://USUARIO:CONTRASEÑA@cluster0.xxxxx.mongodb.net/canciones
 SECRET_TOKEN=una_clave_larga_y_secreta
 ```
 
+- `DB_MONGO`: cadena de conexión de MongoDB Atlas.
+- `SECRET_TOKEN`: clave con la que se firman los tokens.
+
 ## Inicio
 
 ```
 npm install
-npm start        # o npm run dev (con nodemon)
+npm start        # node index.js
+npm run dev      # con nodemon
 ```
 
 El servidor corre en `http://localhost:4000`.
 
 ## Autenticación
 
-1. `POST /usuarios/login` con `{ "nombre": "...", "password": "..." }`.
-   Si el usuario no existe lo crea (201); si existe valida la contraseña (200). Devuelve un `token`.
-2. En las demás peticiones se envía el header `Authorization: Bearer <token>`.
-3. El token expira a los 5 días. Sin token, o con uno inválido o vencido, la API responde 401.
+1. `POST /usuarios/login` con `nombre` y `password`. Si el usuario no existe se crea; si existe se valida su contraseña. En ambos casos responde con un `token` válido por 5 días.
+2. En las demás rutas se envía el header `Authorization: Bearer <token>`. Sin token válido la API responde `401`.
 
 ## Endpoints
 
-Todas las rutas, excepto `/usuarios/login`, requieren token.
+| Método | URL | Token | Acción |
+|---|---|---|---|
+| POST | /usuarios/login | No | Crear usuario o iniciar sesión |
+| POST | /canciones/alta | Sí | Registrar canción |
+| GET | /canciones/obtenerVarios | Sí | Consultar todas |
+| GET | /canciones/obtenerUno/:id | Sí | Consultar una |
+| PUT | /canciones/actualizar/:id | Sí | Actualizar |
+| DELETE | /canciones/baja/:id · /canciones/eliminar/:id | Sí | Eliminar |
+| POST | /disqueras/alta | Sí | Registrar disquera |
+| GET | /disqueras/obtenerVarios | Sí | Consultar todas con sus canciones |
+| GET | /disqueras/obtenerUno/:id | Sí | Consultar una con sus canciones |
+| PUT | /disqueras/actualizar/:id | Sí | Actualizar |
+| DELETE | /disqueras/baja/:id · /disqueras/eliminar/:id | Sí | Eliminar (y sus canciones) |
+| GET | /ubicacion/dondeEstoy?lat=..&lon=.. | Sí | Ciudad según coordenadas |
 
-| Método | URL | Acción |
-|---|---|---|
-| POST | /usuarios/login | Crear usuario o iniciar sesión |
-| POST | /canciones/alta | Registrar canción |
-| GET | /canciones/obtenerVarios | Consultar todas |
-| GET | /canciones/obtenerUno/:id | Consultar una |
-| PUT | /canciones/actualizar/:id | Actualizar |
-| DELETE | /canciones/baja/:id o /canciones/eliminar/:id | Eliminar |
-| POST | /disqueras/alta | Registrar disquera |
-| GET | /disqueras/obtenerVarios | Consultar todas (con sus canciones) |
-| GET | /disqueras/obtenerUno/:id | Consultar una (con sus canciones) |
-| PUT | /disqueras/actualizar/:id | Actualizar |
-| DELETE | /disqueras/baja/:id o /disqueras/eliminar/:id | Eliminar (también borra sus canciones) |
-| GET | /ubicacion/dondeEstoy?lat=..&lon=.. | Ciudad según coordenadas |
+## Ejemplos de cuerpo (JSON o x-www-form-urlencoded)
 
-## Ejemplos
+Login:
+```json
+{ "nombre": "andres", "password": "1234" }
+```
 
 Disquera:
-
 ```json
 { "nombre": "Sony Music México", "ubicacion": "Ciudad de México" }
 ```
 
 Canción (`disquera` es el `_id` de una disquera existente):
-
 ```json
 {
   "titulo": "Sabor a mí",
   "genero": "Bolero",
   "artista": "Trío Los Panchos",
   "precio": 15.5,
-  "disquera": "ID_DE_LA_DISQUERA"
+  "disquera": "<_id de la disquera>"
 }
 ```
